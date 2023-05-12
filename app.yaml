@@ -1,0 +1,12 @@
+runtime: nodejs14
+env_variables:
+  SQL_HOST: 35.245.77.252
+  SQL_USER: root
+  SQL_PASSWORD: G*z7LN83%d&i^xBrMbpxb9P
+  SQL_DATABASE: mturk_sg
+  INSTANCE_CONNECTION_NAME: opim-big-data-analytics:us-east4:mturk-sg-data
+  SQ_SQL_USER: app_access
+  SQ_SQL_PASSWORD: wonton_soup
+  SQ_SQL_DATABASE: sequence_labeler
+beta_settings:
+  cloud_sql_settings: opim-big-data-analytics:us-east4:mturk-sg-data 
