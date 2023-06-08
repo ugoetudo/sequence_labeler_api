@@ -4,6 +4,7 @@ var moment = require("moment");
 var cors = require('cors');
 var MyConConfig = require("../db/db.config");
 
+
 //for dev
 //https://sequence-labeler-ui-dot-opim-big-data-analytics.ue.r.appspot.com
 var corsOptions = {
@@ -38,7 +39,7 @@ if (process.env.INSTANCE_CONNECTION_NAME) {
     }
 }
 */
-var con = mysql.createConnection(MyConConfig);
+var con = mysql.createConnection(MyConConfig.conConfig);
 
 con.connect(function(err) {
     if (err) throw err;

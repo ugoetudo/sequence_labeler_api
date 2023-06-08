@@ -17,9 +17,9 @@ if (process.env.INSTANCE_CONNECTION_NAME) {
 }
 */
 var corsOptions = {
-    origin: 'https://sg-turk-ui-dot-opim-big-data-analytics.ue.r.appspot.com',
+    origin: '*',
   }
-var con = mysql.createConnection(conConfig_TestAPI);
+var con = mysql.createConnection(conConfig.conConfig_TestAPI);
 
 con.connect(function(err) {
     if (err) throw err;
