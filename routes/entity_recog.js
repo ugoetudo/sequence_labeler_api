@@ -4,6 +4,7 @@ var moment = require("moment");
 var cors = require('cors');
 var MyConConfig = require("../db/db.config");
 
+
 //for dev
 //https://sequence-labeler-ui-dot-opim-big-data-analytics.ue.r.appspot.com
 var corsOptions = {
@@ -38,12 +39,15 @@ if (process.env.INSTANCE_CONNECTION_NAME) {
     }
 }
 */
-var con = mysql.createConnection(MyConConfig);
+
+var con = mysql.createConnection(MyConConfig.conConfig);
 
 con.connect(function(err) {
     if (err) throw err;
     console.log("connected");
 });
+
+
 
 var router = express.Router();
 router.use(cors())
@@ -64,6 +68,7 @@ router.get('/HITLength', cors(corsOptions), function(req, res, next) {
 
 router.get('/submitAnnotation', cors(corsOptions), function(req, res, next) {
     res.setHeader('Access-Control-Allow-Origin', '*')
+    
     const annotation_labels = {person:1,place:2,organization:3,religion:4,ideology:5,'problem practice':6,'combatant group':7,victim:8, 'other group':9}
     //none label is id 99
     var hitid = req.query.hitid;
@@ -72,67 +77,85 @@ router.get('/submitAnnotation', cors(corsOptions), function(req, res, next) {
     var tkids = req.query.tkids; //this will be a list of ids //will need to loop to insert each token into annotation table
     var tksjson = JSON.parse(tkids)
     console.log(tksjson)
-    con.query('select turkid from turk where amazon_turkid = ?', [turkid], function(error, results, fields) {
-        turkid = results[0].turkid;
-        con.query('update annotation set deprecated = 1 where sid = ? and turkid = ?',[sid, turkid], function(e,r,f){
-            if (e) {
-                console.log(e)
-            }
-            if (Object.keys(tksjson).length > 0)
-            {
-                var annotations = []
-                //deprecate any existing annotation for this sentence made by this turk
-                annotations = Object.keys(tksjson)
-                var labels = []
-                annotations.forEach(key => labels.push(Object.keys(tksjson[key])));
-                var unique_labels = []
-                var insertAnnotation = function(uuid, tokens, label) {
-                    annotation_time = moment(Date.now()).format('YYYY-MM-DD HH:mm:ss');
-                    tokens.forEach(tk => {
-                        con.query('insert into annotation set ?',
-                        {turkid:turkid,
-                            spanid:uuid,
-                            annotation_time:annotation_time, 
-                            labelid:annotation_labels[label], 
-                            tkid:tk.token_position,
-                            hitid:hitid,
-                            sid:sid,
-                            token_text:tk.token_literal,
-                            deprecated:0});
-                    });
-                }
-                for (var i = 0; i < labels.length; i++) {
-                    unique_labels = labels.unique()
-                }
-                if (unique_labels.length > 0) {
-                    unique_labels.forEach(x => {
-                        annotations.forEach(key => {
-                            
-                            //console.log(`processing: ${tksjson[key][x]}`);
-                            if (tksjson[key][x]) {
-                                insertAnnotation(key,tksjson[key][x],x);
+    
+    con.query('select labelid, label_name from label' , function(e, r, f) {
+        if (e) {
+            throw e
+        }
+        else {
+            var labels_dict = {}
+            var labels = JSON.parse(JSON.stringify(r))
+            console.log(labels)
+                    labels.forEach(item => {
+                        labels_dict[item["label_name"]] = item["labelid"]
+                        console.log(item.label_name)
+                    })
+                    con.query('select turkid from turk where amazon_turkid = ?', [turkid], function(error, results, fields) {
+                        turkid = results[0].turkid;
+                        con.query('update annotation set deprecated = 1 where sid = ? and turkid = ?',[sid, turkid], function(e,r,f){
+                            if (e) {
+                                console.log(e)
                             }
-                        });
-                    });
-                }
-                res.json({status:'OK'});
-            }
-            else 
-            {
-                annotation_time = moment(Date.now()).format('YYYY-MM-DD HH:mm:ss');
-                con.query('insert into annotation set ?',
-                                {turkid:results[0].turkid,
-                                    annotation_time:annotation_time, 
-                                    labelid:99, 
-                                    tkid:null,
-                                    hitid:hitid,
-                                    sid:sid,
-                                    token_text:null,
-                                    deprecated:0});
-                res.json({status:'OK',notes:'no labels added'});
-            }
-        })
+                            if (Object.keys(tksjson).length > 0)
+                            {
+                                var annotations = []
+                                console.log(labels_dict)
+                                //deprecate any existing annotation for this sentence made by this turk
+                                annotations = Object.keys(tksjson)
+                                var labels = []
+                                annotations.forEach(key => labels.push(Object.keys(tksjson[key])));
+                                var unique_labels = []
+                                var insertAnnotation = function(uuid, tokens, label) {
+                                    annotation_time = moment(Date.now()).format('YYYY-MM-DD HH:mm:ss');
+                                    tokens.forEach(tk => {
+                                        con.query('insert into annotation set ?',
+                                        {turkid:turkid,
+                                            spanid:uuid,
+                                            annotation_time:annotation_time, 
+                                            labelid:labels_dict[label], 
+                                            tkid:tk.token_position,
+                                            hitid:hitid,
+                                            sid:sid,
+                                            token_text:tk.token_literal,
+                                            deprecated:0});
+                                    });
+                                }
+                                for (var i = 0; i < labels.length; i++) {
+                                    unique_labels = labels.unique()
+                                }
+                                if (unique_labels.length > 0) {
+                                    unique_labels.forEach(x => {
+                                        annotations.forEach(key => {
+                                            
+                                            //console.log(`processing: ${tksjson[key][x]}`);
+                                            if (tksjson[key][x]) {
+                                                insertAnnotation(key,tksjson[key][x],x);
+                                            }
+                                        });
+                                    });
+                                }
+                                res.json({status:'OK'});
+                            }
+                            else 
+                            {
+                                annotation_time = moment(Date.now()).format('YYYY-MM-DD HH:mm:ss');
+                                con.query('insert into annotation set ?',
+                                                {turkid:results[0].turkid,
+                                                    annotation_time:annotation_time, 
+                                                    labelid:99, 
+                                                    tkid:null,
+                                                    hitid:hitid,
+                                                    sid:sid,
+                                                    token_text:null,
+                                                    deprecated:0});
+                                res.json({status:'OK',notes:'no labels added'});
+                            }
+                        })
+                    })
+        }
     })
+
+    
 });
 
 router.get('/getObservationByRank', cors(corsOptions), function(req, res, next) {
@@ -239,17 +262,7 @@ router.get('/getObservation', cors(corsOptions), function(req, res, next){
     });
 });
 
-router.get('/getButtons', cors(corsOptions), function(req, res, next) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    con.query('select label_name from label', function (e,r,f){
-        if (e) {
-            throw e;
-        }
-        else {
-            res.json(r)
-        }
-    });
-});
+
 
 router.get('/getHITSize', cors(corsOptions), function(req, res, next){
     res.setHeader('Access-Control-Allow-Origin', '*')
@@ -261,6 +274,16 @@ router.get('/getHITSize', cors(corsOptions), function(req, res, next){
                 res.json(r);
             }
         })
+});
+
+router.get('/getLabels', cors(corsOptions), function(req, res, next){
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    con.query('select labelid, label_name, label_notes from label', function(e,r,f) {
+        if (e) {throw e}
+        else {
+            res.json(r)
+        }
+    });
 });
 
 module.exports = router;
