@@ -8,7 +8,7 @@ var MyConConfig = require("../db/db.config");
 //for dev
 //https://sequence-labeler-ui-dot-opim-big-data-analytics.ue.r.appspot.com
 var corsOptions = {
-    origin: '*',
+    origin: "*",
   }
 
 Array.prototype.contains = function(v) {
@@ -50,11 +50,11 @@ con.connect(function(err) {
 
 
 var router = express.Router();
-router.use(cors())
+//router.use(cors())
 router.get('/HITLength', cors(corsOptions), function(req, res, next) {
     var hitid = req.query.hitid;
-    res.setHeader('Access-Control-Allow-Origin', '*')
-    con.query('select hitid, count(*) as cnt from sentence where hitid = ? group by hitid', 
+    //res.setHeader('Access-Control-Allow-Origin', corsOptions.origin)
+    con.query('select hitid, count(*) as cnt from assignment where hitid = ? group by hitid', 
         [hitid], function(error, results, fields){
             if(error){
                 console.log(error);
@@ -67,7 +67,7 @@ router.get('/HITLength', cors(corsOptions), function(req, res, next) {
 });
 
 router.get('/submitAnnotation', cors(corsOptions), function(req, res, next) {
-    res.setHeader('Access-Control-Allow-Origin', '*')
+    //res.setHeader('Access-Control-Allow-Origin', corsOptions.origin)
     
     const annotation_labels = {person:1,place:2,organization:3,religion:4,ideology:5,'problem practice':6,'combatant group':7,victim:8, 'other group':9}
     //none label is id 99
@@ -159,7 +159,7 @@ router.get('/submitAnnotation', cors(corsOptions), function(req, res, next) {
 });
 
 router.get('/getObservationByRank', cors(corsOptions), function(req, res, next) {
-    res.setHeader('Access-Control-Allow-Origin', '*')
+    //res.setHeader('Access-Control-Allow-Origin', corsOptions.origin)
     var hitid = req.query.hitid;
     var rank_value = req.query.value_rank;
     var turkid = req.query.turkid;
@@ -169,17 +169,16 @@ router.get('/getObservationByRank', cors(corsOptions), function(req, res, next) 
             let int_turkid = results[0].turkid;
             if (error) {console.log(error)}
             console.log(int_turkid)
-            con.query('select spanid, s.sid, tkid, token_text, label_name, rank_value '+
-                      'from annotation a, sentence s, label l where a.sid = s.sid and l.labelid = a.labelid '+
-                      'and turkid = ? and rank_value = ? and a.hitid = ? and deprecated = 0', [int_turkid, rank_value-1, hitid], 
+            con.query('select spanid, s.sid, tkid, token_text, label_name, ast.rank_value '+
+                      'from annotation a, sentence s, label l, assignment ast where a.sid = s.sid and ast.sid = s.sid and l.labelid = a.labelid '+
+                      'and turkid = ? and ast.rank_value = ? and a.hitid = ? and a.deprecated = 0', [int_turkid, rank_value-1, hitid], 
                 function (e,r,f) {
                     if (e) {
                         console.log(e)
                     }
                     else {
-                        
-                        con.query('select s.sid, t.tkid, token_text, s.rank_value from token t, sentence s where t.sid = s.sid ' + 
-                                  'and s.hitid = ? and s.sid = ?', [hitid, r[0].sid], function (er, re, ef){
+                        con.query('select s.sid, t.tkid, token_text, a.rank_value from token t, sentence s, assignment a where t.sid = s.sid ' + 
+                                  'and a.hitid = ? and s.sid = a.sid and s.sid = ? order by tkid', [hitid, r[0].sid], function (er, re, ef){
                                     if (er) {
                                         console.log(er)
                                     }
@@ -195,7 +194,7 @@ router.get('/getObservationByRank', cors(corsOptions), function(req, res, next) 
 });
 
 router.get('/getObservation', cors(corsOptions), function(req, res, next){
-    res.setHeader('Access-Control-Allow-Origin', '*')
+    //res.setHeader('Access-Control-Allow-Origin', corsOptions.origin)
     console.log("get obs called")
     obs_callback = (error, results, fields) => {
         if (error) {throw error}
@@ -235,10 +234,11 @@ router.get('/getObservation', cors(corsOptions), function(req, res, next){
                                     completed_sents.push(row.sid)
                                 });
                                 //now lets retrieve the NEXT sentence and its tokens (only returning a single sentence)
-                                con.query('select s.sid, tkid, token_text, rank_value from token t, sentence s where s.sid = t.sid and s.sid = '+
-                                            '(select sid from sentence where hitid = ? and sid not in (?)'+ 
-                                            'order by rank_value asc limit 1) order by tkid asc',
-                                            [hitid, completed_sents], function(e,r,f) {
+                                con.query('select s.sid, tkid, token_text, a.rank_value from token t, sentence s, assignment a '+
+                                            'where s.sid = t.sid and a.sid = s.sid and a.hitid = ? and s.sid = '+
+                                            '(select s.sid from sentence s, assignment a where a.sid = s.sid AND a.hitid = ? and s.sid not in (?)'+ 
+                                            'order by a.rank_value asc limit 1) order by tkid asc',
+                                            [hitid, hitid, completed_sents], function(e,r,f) {
                                                 console.log(r)
                                                 res.json(r);
                                             });
@@ -246,15 +246,19 @@ router.get('/getObservation', cors(corsOptions), function(req, res, next){
                             else
                             {
                                 console.log(hitid)
-                                con.query('select s.sid, tkid, token_text, rank_value from token t, sentence s where s.sid = t.sid and s.sid = '+
-                                            '(select sid from sentence where hitid = ?'+ 
-                                            'order by rank_value asc limit 1) order by tkid asc',
-                                            [hitid], function(e,r,f){
-                                                if (r) {
-                                                    console.log('called');
-                                                    res.json(r);
-                                                }
-                                                else {console.log('not r')}
+                                con.query('select s.sid, tkid, token_text, a.rank_value from token t, sentence s, assignment a '+
+                                            'where s.sid = t.sid and a.sid = s.sid and a.hitid = ? and s.sid = '+
+                                            '(select s.sid from sentence s, assignment a where a.sid = s.sid AND a.hitid = ?'+ 
+                                            'order by a.rank_value asc limit 1) order by tkid asc',
+                                            [hitid, hitid], function(e,r,f){
+                                            if (e) {
+                                                console.log(e)
+                                            }
+                                            else if (r) {
+                                                console.log('called');
+                                                res.json(r);
+                                            }
+                                            
                                             });
                             }
                         });
@@ -265,9 +269,9 @@ router.get('/getObservation', cors(corsOptions), function(req, res, next){
 
 
 router.get('/getHITSize', cors(corsOptions), function(req, res, next){
-    res.setHeader('Access-Control-Allow-Origin', '*')
+   // res.setHeader('Access-Control-Allow-Origin', corsOptions.origin)
     let hitid = req.query.hitid
-    con.query('select count(*) as hit_size from sentence where hitid = ?',[hitid],
+    con.query('select count(*) as hit_size from sentences s, assignment a WHERE a.sid = s.sid AND hitid = ?',[hitid],
         function(e,r,f){
             if (e) {throw e}
             else {
@@ -277,8 +281,8 @@ router.get('/getHITSize', cors(corsOptions), function(req, res, next){
 });
 
 router.get('/getLabels', cors(corsOptions), function(req, res, next){
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    con.query('select labelid, label_name, label_notes from label', function(e,r,f) {
+    // res.setHeader('Access-Control-Allow-Origin', corsOptions.origin);
+    con.query('select labelid, label_name, label_notes from label where deprecated <> \'1\'', function(e,r,f) {
         if (e) {throw e}
         else {
             res.json(r)
