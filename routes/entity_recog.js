@@ -178,7 +178,7 @@ router.get('/getObservationByRank', cors(corsOptions), function(req, res, next) 
                     }
                     else {
                         con.query('select s.sid, t.tkid, token_text, a.rank_value from token t, sentence s, assignment a where t.sid = s.sid ' + 
-                                  'and a.hitid = ? and s.sid = a.sid and s.sid = ? order by tkid', [hitid, r[0].sid], function (er, re, ef){
+                                  'and a.hitid = ? and s.sid = a.sid and s.sid = ? order by tkid asc', [hitid, r[0].sid], function (er, re, ef){
                                     if (er) {
                                         console.log(er)
                                     }
